@@ -1,3 +1,6 @@
+First run in terminal:
+export PATH="/Applications/CMake.app/Contents/bin":"$PATH"
+
 # pddlstream
 
 PDDLStream is a planning framework comprised of an action language and suite of algorithms for Artificial Intelligence (AI) planning in the presence of sampling procedures.

@@ -143,15 +143,17 @@ def get_kitchen_task(arm='left', grasp_type='top'):
     set_arm_conf(pr2, other_arm, arm_conf(other_arm, REST_LEFT_ARM))
     close_arm(pr2, other_arm)
 
-    table, cabbage, sink, stove = create_kitchen()
+    table, cabbage, sink, stove, cheese, salt = create_kitchen()
     floor = get_bodies()[1]
     class_from_body = {
         table: 'table',
         cabbage: 'cabbage',
         sink: 'sink',
         stove: 'stove',
+        cheese: 'cheese',
+        salt: 'salt'
     } # TODO: use for debug
-    movable = [cabbage]
+    movable = [cabbage, cheese, salt]
     surfaces = [table, sink, stove]
     rooms = [floor]
 
@@ -163,7 +165,8 @@ def get_kitchen_task(arm='left', grasp_type='top'):
         #goal_registered=[cabbage],
         #goal_holding=[(arm, cabbage)],
         #goal_on=[(cabbage, table)],
-        goal_on=[(cabbage, sink)],
+        # goal_on=[(cabbage, sink)],
+        goal_on=[(cheese, sink)]
     )
 
 def get_problem1(localized='rooms', **kwargs):
