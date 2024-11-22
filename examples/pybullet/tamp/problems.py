@@ -168,7 +168,6 @@ def stacked(arm='left', grasp_type='top', num=5):
     block_width = 0.07
     block_height = 0.1
     #block_height = 2*block_width
-    block_area = block_width*block_width
 
     other_arm = get_other_arm(arm)
     initial_conf = get_carry_conf(arm, grasp_type)
