@@ -103,15 +103,21 @@ def blocked(arm='left', grasp_type='side', num=1):
     set_point(table1, Point(x=+table_x, y=0))
     table2 = create_table()
     set_point(table2, Point(x=-table_x, y=0))
-    #table3 = create_table()
-    #set_point(table3, Point(x=0, y=0))
+    table3 = create_table()
+    set_point(table3, Point(x=0, y=0))
+    table4 = create_table()
+    set_point(table4, Point(x=0, y=+1.2))
+    table5 = create_table()
+    set_point(table5, Point(x=0, y=-1.2))
 
     plate = create_box(0.6, 0.6, plate_height, color=GREEN)
     x, y, _ = get_point(table1)
     plate_z = stable_z(plate, table1)
     set_point(plate, Point(x=x, y=y-0.3, z=plate_z))
-    #surfaces = [table1, table2, table3, plate]
-    surfaces = [table1, table2, plate]
+    surfaces = [table1, table2, table3, table4, table5, plate]
+    # surfaces = [table1, table2, table3, table4, plate]
+    # surfaces = [table1, table2, table3, plate]
+    # surfaces = [table1, table2, plate]
 
     green1 = create_box(block_width, block_width, block_height, color=BLUE)
     green1_z = stable_z(green1, table1)
@@ -155,9 +161,44 @@ def blocked(arm='left', grasp_type='side', num=1):
                    body_types=body_types, base_limits=base_limits, costs=True)
 
 #######################################################
+def stacked(arm='left', grasp_type='top', num=5):
+    base_extent = 5.0
 
+    base_limits = (-base_extent/2.*np.ones(2), base_extent/2.*np.ones(2))
+    block_width = 0.07
+    block_height = 0.1
+    #block_height = 2*block_width
+    block_area = block_width*block_width
 
+    other_arm = get_other_arm(arm)
+    initial_conf = get_carry_conf(arm, grasp_type)
+
+    add_data_path()
+    floor = load_pybullet("plane.urdf")
+    pr2 = create_pr2()
+    set_arm_conf(pr2, arm, initial_conf)
+    open_arm(pr2, arm)
+    set_arm_conf(pr2, other_arm, arm_conf(other_arm, REST_LEFT_ARM))
+    close_arm(pr2, other_arm)
+    set_group_conf(pr2, 'base', [-1.0, 0, 0]) # Be careful to not set the pr2's pose
+
+    table = create_table()
+    red_block = create_box(block_width+0.02, block_width+0.02, block_height, color=RED)
+    red_z = stable_z(red_block, table)
+    set_point(red_block, Point(z=red_z))
+    surfaces = [table, red_block]
+
+    blue_block = create_box(block_width, block_width, block_height, color=BLUE)
+    initial_surfaces = {blue_block: table}
+    sample_placements(initial_surfaces, obstacles=[red_block])
+
+    return Problem(robot=pr2, movable=[blue_block, red_block], arms=[arm], grasp_types=[grasp_type], surfaces=surfaces,
+                   #goal_holding=[(arm, block) for block in blocks])
+                   goal_on=[(blue_block, red_block)], base_limits=base_limits)
+
+#######################################################
 PROBLEMS = [
     packed,
     blocked,
+    stacked,
 ]

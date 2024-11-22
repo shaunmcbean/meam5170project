@@ -131,7 +131,7 @@ def main(verbose=True):
     # TODO: option to only consider costs during local optimization
 
     parser = create_parser()
-    parser.add_argument('-problem', default='packed', help='The name of the problem to solve')
+    parser.add_argument('-problem', default='stacked', help='The name of the problem to solve')
     parser.add_argument('-n', '--number', default=5, type=int, help='The number of objects')
     parser.add_argument('-cfree', action='store_true', help='Disables collisions')
     parser.add_argument('-deterministic', action='store_true', help='Uses a deterministic sampler')
