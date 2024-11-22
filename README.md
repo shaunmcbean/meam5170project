@@ -1,3 +1,9 @@
+**To run quadrotor sim: **
+```
+cd examples/pybullet/utils
+python -m examples.test_quadrotor
+```
+
 First run in terminal:
 export PATH="/Applications/CMake.app/Contents/bin":"$PATH"
 
