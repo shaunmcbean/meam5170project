@@ -97,7 +97,7 @@ def create_table(width=0.6, length=1.2, height=0.73, thickness=0.03, radius=0.01
     return body
 
 def create_door():
-    return load_pybullet("data/door.urdf")
+    return load_pybullet("examples/pybullet/utils/models/door.urdf")
 
 #######################################################
 
@@ -158,6 +158,16 @@ def create_kitchen(w=0.7, h=.7):
 
     table = create_box(w, w, h, color=(.75, .75, .75, 1)) # gray
     set_point(table, (2, 0, h/2))
+
+    table_x = (10.0 - 1) / 2.
+    # table1 = create_table()
+    # set_point(table1, Point(x=+table_x, y=0))
+    # table2 = create_table()
+    # set_point(table2, Point(x=-table_x, y=0))
+
+    # door = create_door()
+    door = create_box(w, w, h)
+    set_point(door, Point(x=+table_x, y=0))
  
     mass = 1
     #mass = 0.01
@@ -173,12 +183,14 @@ def create_kitchen(w=0.7, h=.7):
     set_point(salt, (2, -2.2, h + .1/2))
 
     sink = create_box(w, w, h, color=(.25, .25, .75, 1)) # blue
+    # sink = load_pybullet("examples/pybullet/utils/models/sink.urdf")
     set_point(sink, (2, -2, h/2))
 
     stove = create_box(w, w, h, color=(.75, .25, .25, 1)) # red
+    # stove = load_pybullet("examples/pybullet/utils/models/stove.urdf")
     set_point(stove, (2, 2, h/2))
 
-    return table, cabbage, sink, stove, cheese, salt
+    return table, door, cabbage, sink, stove, cheese, salt
 
 #######################################################
 
