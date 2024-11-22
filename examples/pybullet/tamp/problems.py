@@ -182,18 +182,23 @@ def stacked(arm='left', grasp_type='top', num=5):
     set_group_conf(pr2, 'base', [-1.0, 0, 0]) # Be careful to not set the pr2's pose
 
     table = create_table()
-    red_block = create_box(block_width+0.02, block_width+0.02, block_height, color=RED)
+    red_block = create_box(block_width, block_width, block_height, color=RED)
     red_z = stable_z(red_block, table)
     set_point(red_block, Point(z=red_z))
-    surfaces = [table, red_block]
 
-    blue_block = create_box(block_width, block_width, block_height, color=BLUE)
+    green_block = create_box(block_width+ 0.04, block_width+0.04, block_height, color=GREEN)
+    green_z = stable_z(green_block, table)
+    set_point(green_block, Point(x = 0.2, y = 0.1, z=green_z))
+
+    surfaces = [table, red_block, green_block]
+
+    blue_block = create_box(block_width-0.01, block_width-0.01, block_height, color=BLUE)
     initial_surfaces = {blue_block: table}
-    sample_placements(initial_surfaces, obstacles=[red_block])
+    sample_placements(initial_surfaces, obstacles=[red_block, green_block])
 
     return Problem(robot=pr2, movable=[blue_block, red_block], arms=[arm], grasp_types=[grasp_type], surfaces=surfaces,
                    #goal_holding=[(arm, block) for block in blocks])
-                   goal_on=[(blue_block, red_block)], base_limits=base_limits)
+                   goal_on=[(blue_block,red_block),(red_block, green_block)], base_limits=base_limits)
 
 #######################################################
 PROBLEMS = [
