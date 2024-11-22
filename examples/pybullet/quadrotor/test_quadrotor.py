@@ -37,7 +37,7 @@ def main():
 
     # Start and end poses
     start_pose = ([0, 0, 0.5], [0, 0, 0, 1])  # Initial position and orientation (quaternion)
-    end_pose = multiply(start_pose, Pose(Point(z=1.0)))  # Move 1 meter upwards
+    end_pose = multiply(start_pose, Pose(Point(x = -5.0, y = 1.0, z=3.0)))  # Move 1 meter upwards
     
     print("Testing trajectory...")
     test_trajectory(quadrotor, start_pose, end_pose)
