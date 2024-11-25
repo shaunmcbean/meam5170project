@@ -4,7 +4,7 @@ from __future__ import print_function
 import pybullet as p
 import time
 import numpy as np
-from pybullet_tools.utils import add_data_path, connect, disconnect, wait_for_user, \
+from examples.pybullet.utils.pybullet_tools.utils import add_data_path, connect, disconnect, wait_for_user, \
     draw_pose, Pose, Point, multiply, interpolate_poses, add_line, point_from_pose, remove_handles, BLUE
 
 m = 0.5
@@ -135,8 +135,7 @@ def main():
     # draw_pose(Pose(), length=1.)
 
     # Load the plane and the quadrotor model
-    plane = p.loadURDF("plane.urdf")
-    QUAD_PATH = "models/quadrotor/quadrotor.urdf"
+    QUAD_PATH = "examples/pybullet/utils/models/quadrotor/quadrotor.urdf"
     quadrotor = p.loadURDF(QUAD_PATH, [0, 0, 0.5], useFixedBase=False)  # Adjust path as necessary
     
     # Desired trajectory
