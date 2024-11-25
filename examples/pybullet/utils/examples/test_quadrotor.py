@@ -3,8 +3,14 @@
 from __future__ import print_function
 import pybullet as p
 import time
+import numpy as np
 from pybullet_tools.utils import add_data_path, connect, disconnect, wait_for_user, \
     draw_pose, Pose, Point, multiply, interpolate_poses, add_line, point_from_pose, remove_handles, BLUE
+
+m = 0.5
+g = 9.81
+I = 0.004
+a = 0.175
 
 def test_trajectory(robot, start_pose, end_pose, step_size=0.01):
     """
@@ -20,28 +26,150 @@ def test_trajectory(robot, start_pose, end_pose, step_size=0.01):
         time.sleep(0.1)  # Simulate real-time movement
     remove_handles(handles)
 
+# def quadrotor_dynamics(x, u):
+#     y, z, theta, y_dot, z_dot, theta_dot = x
+#     u1, u2 = u
+
+#     y_ddot = -np.sin(theta) / m * (u1 + u2)
+#     z_ddot = -g + np.cos(theta) / m * (u1 + u2)
+#     theta_ddot = a / I * (u1 - u2)
+
+#     return np.array([y_dot, z_dot, theta_dot, y_ddot, z_ddot, theta_ddot])
+
+def quadrotor_dynamics(x, u):
+    # State unpacking
+    x, y, z, phi, theta, psi, x_dot, y_dot, z_dot, phi_dot, theta_dot, psi_dot = x
+    u1, u2, u3, u4 = u  # Thrust inputs for each propeller
+
+    # Forces and torques
+    thrust = np.array([0, 0, sum(u)])  # Net thrust (upward)
+    moments = np.array([
+        a * (u2 - u4),  # Roll torque
+        a * (u3 - u1),  # Pitch torque
+        I * (u1 - u2 + u3 - u4)  # Yaw torque
+    ])
+
+    # Rotation matrix from body to world frame
+    R = np.array([
+        [np.cos(psi) * np.cos(theta), np.cos(psi) * np.sin(theta) * np.sin(phi) - np.sin(psi) * np.cos(phi), np.cos(psi) * np.sin(theta) * np.cos(phi) + np.sin(psi) * np.sin(phi)],
+        [np.sin(psi) * np.cos(theta), np.sin(psi) * np.sin(theta) * np.sin(phi) + np.cos(psi) * np.cos(phi), np.sin(psi) * np.sin(theta) * np.cos(phi) - np.cos(psi) * np.sin(phi)],
+        [-np.sin(theta), np.cos(theta) * np.sin(phi), np.cos(theta) * np.cos(phi)]
+    ])
+
+    # Accelerations
+    accel = R @ thrust / m - np.array([0, 0, g])  # Net acceleration
+
+    # Angular accelerations (simplified for this case)
+    angular_accel = moments / I
+
+    # Return the state derivatives
+    return np.array([
+        x_dot, y_dot, z_dot,  # Position derivatives
+        phi_dot, theta_dot, psi_dot,  # Angular velocity derivatives
+        accel[0], accel[1], accel[2],  # Linear accelerations
+        angular_accel[0], angular_accel[1], angular_accel[2]  # Angular accelerations
+    ])
+
+
+def simulate_quadrotor(quadrotor, xd_func, ud_func, t_f, dt):
+    # initial state
+    # x = np.array([0, 0.5, 0, 0, 0, 0])
+    x = np.zeros(12)
+    t = 0
+
+    while t < t_f:
+        # desired state and input
+        xd = xd_func(t)
+        print(xd)
+        ud = ud_func(t)
+
+        # control input (LQR)
+        xe = x - xd
+        # K = np.array([[5, 0, 0],    # Gain for y_error, z_error, theta_error
+        #             [0, 10, 0]])
+        # Feedback control for x, y, z and angular errors
+        K_p = np.diag([2, 2, 5])  # Position gains
+        K_o = np.diag([0.1, 0.1, 0.1])   # Orientation gains
+
+        position_error = xe[:3]    # x, y, z errors
+        orientation_error = xe[3:6]  # roll, pitch, yaw errors
+
+        thrust_correction = -K_p @ position_error
+        moment_correction = -K_o @ orientation_error
+
+        # u_feedback = -K @ xe[:3]
+        # Convert corrections to propeller inputs
+        u_feedback = np.array([
+            thrust_correction[2] / 4 + moment_correction[0] / (2 * a) + moment_correction[2] / (4 * I),
+            thrust_correction[2] / 4 - moment_correction[0] / (2 * a) - moment_correction[2] / (4 * I),
+            thrust_correction[2] / 4 + moment_correction[1] / (2 * a) + moment_correction[2] / (4 * I),
+            thrust_correction[2] / 4 - moment_correction[1] / (2 * a) - moment_correction[2] / (4 * I)
+        ])
+
+        u = ud + u_feedback
+
+        u = np.clip(u, 0, 10)  # Clip inputs to feasible range
+
+        # step dynamics
+        x_dot = quadrotor_dynamics(x, u)
+        x += x_dot * dt
+
+        # PyBullet simulation update
+        # position = [0, x[0], x[1]] # fixed x-axis motion (2D quadrotor)
+        # orientation = p.getQuaternionFromEuler([0, 0, x[2]])
+        # p.resetBasePositionAndOrientation(quadrotor, position, orientation)
+        position = [x[0], x[1], x[2]]
+        orientation = p.getQuaternionFromEuler([x[3], x[4], x[5]])
+        p.resetBasePositionAndOrientation(quadrotor, position, orientation)
+        p.stepSimulation()
+        
+
+        time.sleep(dt)
+        t += dt
+
 #####################################
 
 def main():
     connect(use_gui=True)
     add_data_path()
-    draw_pose(Pose(), length=1.)
+    # draw_pose(Pose(), length=1.)
 
     # Load the plane and the quadrotor model
     plane = p.loadURDF("plane.urdf")
     QUAD_PATH = "models/quadrotor/quadrotor.urdf"
     quadrotor = p.loadURDF(QUAD_PATH, [0, 0, 0.5], useFixedBase=False)  # Adjust path as necessary
     
+    # Desired trajectory
+    # def xd_func(t):
+    #     z_d = 0.5 + 0.1 * t # Linear ascent
+    #     return np.array([0, z_d, 0, 0, 0, 0])
+    
+    def xd_func(t):
+        x_d = 0.1 * t
+        y_d = 0.1 * t
+        z_d = 0.5 + 0.1 * t
+        return np.array([x_d, y_d, z_d, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    
+    # def ud_func(t):
+    #     return np.array([m * g / 2, m * g / 2]) # Hover thrust inputs
+    
+    def ud_func(t):
+        hover_thrust = m * g / 4
+        return np.array([hover_thrust, hover_thrust, hover_thrust, hover_thrust])
+
+    
     # Check the model
     print("Loaded quadrotor:")
     print(f"Base position: {p.getBasePositionAndOrientation(quadrotor)}")
 
     # Start and end poses
-    start_pose = ([0, 0, 0.5], [0, 0, 0, 1])  # Initial position and orientation (quaternion)
-    end_pose = multiply(start_pose, Pose(Point(z=1.0)))  # Move 1 meter upwards
+    # start_pose = ([0, 0, 0.5], [0, 0, 0, 1])  # Initial position and orientation (quaternion)
+    # end_pose = multiply(start_pose, Pose(Point(z=1.0)))  # Move 1 meter upwards
     
     print("Testing trajectory...")
-    test_trajectory(quadrotor, start_pose, end_pose)
+    # test_trajectory(quadrotor, start_pose, end_pose)
+
+    simulate_quadrotor(quadrotor, xd_func, ud_func, t_f=3.0, dt=0.01)
 
     # Disconnect
     wait_for_user("Press Enter to disconnect...")
