@@ -77,36 +77,55 @@ def simulate_quadrotor(quadrotor, xd_func, ud_func, t_f, dt):
     x = np.zeros(12)
     t = 0
 
-    while t < t_f:
-        # desired state and input
-        xd = xd_func(t)
-        print(xd)
-        ud = ud_func(t)
+    ############################
+    # LQR controller
+    Q = np.eye(12)
+    Q[0, 0] = 10
+    Q[1, 1] = 10
+    Q[2, 2] = 10
+    R = np.eye(4)
+    Qf = Q
 
-        # control input (LQR)
-        xe = x - xd
+    LQR_controller = Quadcopter_LQR(Q, R, Qf, tf=t_f, x_d=xd_func, u_d=ud_func)
+    ############################
+
+    while t < t_f:
+        ############################
+        # desired state and input
+        # xd = xd_func(t)
+        # print(xd)
+        # ud = ud_func(t)
+
+        # # control input (LQR)
+        # xe = x - xd
         # K = np.array([[5, 0, 0],    # Gain for y_error, z_error, theta_error
         #             [0, 10, 0]])
-        # Feedback control for x, y, z and angular errors
-        K_p = np.diag([2, 2, 5])  # Position gains
-        K_o = np.diag([0.1, 0.1, 0.1])   # Orientation gains
+        # # Feedback control for x, y, z and angular errors
+        # K_p = np.diag([2, 2, 5])  # Position gains
+        # K_o = np.diag([0.1, 0.1, 0.1])   # Orientation gains
 
-        position_error = xe[:3]    # x, y, z errors
-        orientation_error = xe[3:6]  # roll, pitch, yaw errors
+        # position_error = xe[:3]    # x, y, z errors
+        # orientation_error = xe[3:6]  # roll, pitch, yaw errors
 
-        thrust_correction = -K_p @ position_error
-        moment_correction = -K_o @ orientation_error
+        # thrust_correction = -K_p @ position_error
+        # moment_correction = -K_o @ orientation_error
 
-        # u_feedback = -K @ xe[:3]
-        # Convert corrections to propeller inputs
-        u_feedback = np.array([
-            thrust_correction[2] / 4 + moment_correction[0] / (2 * a) + moment_correction[2] / (4 * I),
-            thrust_correction[2] / 4 - moment_correction[0] / (2 * a) - moment_correction[2] / (4 * I),
-            thrust_correction[2] / 4 + moment_correction[1] / (2 * a) + moment_correction[2] / (4 * I),
-            thrust_correction[2] / 4 - moment_correction[1] / (2 * a) - moment_correction[2] / (4 * I)
-        ])
+        # # u_feedback = -K @ xe[:3]
+        # # Convert corrections to propeller inputs
+        # u_feedback = np.array([
+        #     thrust_correction[2] / 4 + moment_correction[0] / (2 * a) + moment_correction[2] / (4 * I),
+        #     thrust_correction[2] / 4 - moment_correction[0] / (2 * a) - moment_correction[2] / (4 * I),
+        #     thrust_correction[2] / 4 + moment_correction[1] / (2 * a) + moment_correction[2] / (4 * I),
+        #     thrust_correction[2] / 4 - moment_correction[1] / (2 * a) - moment_correction[2] / (4 * I)
+        # ])
 
-        u = ud + u_feedback
+        # u = ud + u_feedback
+
+        ############################
+        # LQR Controller
+        x = xd_func(t)
+        u = LQR_controller.compute_feedback(t, x)
+        ############################
 
         u = np.clip(u, 0, 10)  # Clip inputs to feasible range
 
@@ -126,7 +145,144 @@ def simulate_quadrotor(quadrotor, xd_func, ud_func, t_f, dt):
 
         time.sleep(dt)
         t += dt
+#####################################
+# LQR Controller adapted from MEAM 5170 HW2 to 3D
+from numpy import matmul
+from numpy.linalg import inv
+from numpy.linalg import cholesky
+from math import sin, cos
+from scipy.interpolate import interp1d
+from scipy.integrate import ode
+from scipy.integrate import solve_ivp
 
+class Quadcopter_LQR(object):
+    '''
+    Constructor. Compute function S(t) using S(t) = L(t) L(t)^t, by integrating backwards
+    from S(tf) = Qf. We will then use S(t) to compute the optimal controller efforts in 
+    the compute_feedback() function
+    '''
+    def __init__(self, Q, R, Qf, tf, x_d, u_d):
+        self.m = m
+        self.a = a
+        self.I = I
+        self.Q = Q
+        self.R = R
+        self.x_d = x_d
+        self.u_d = u_d
+
+        ''' 
+        We are integrating backwards from Qf
+        '''
+
+        # Get L(tf) L(tf).T = S(tf) by decomposing S(tf) using Cholesky decomposition
+        L0 = cholesky(Qf).transpose()
+
+        # We need to reshape L0 from a square matrix into a row vector to pass into solve_ivp()
+        l0 = np.reshape(L0, (144))
+        # L must be integrated backwards, so we integrate L(tf - t) from 0 to tf
+        initial_condition = [0, tf]
+        sol = solve_ivp(self.dldt_minus, [0, tf], l0, dense_output=True)
+        t = sol.t
+        l = sol.y
+
+        # Reverse time to get L(t) back in forwards time
+        t = tf - t
+        t = np.flip(t)
+        l = np.flip(l, axis=1) # flip in time
+        self.l_spline = interp1d(t, l)
+
+    def Ldot(self, t, L):
+
+        x, y, z, phi, theta, psi, x_dot, y_dot, z_dot, phi_dot, theta_dot, psi_dot = self.x_d(t)
+        u = self.u_d(t)
+        Q = self.Q
+        R = self.R
+
+        F = np.sum(u)/self.m
+        rx = cos(phi)*sin(theta)*cos(psi) + sin(phi)*sin(psi)
+        ry = cos(phi)*sin(theta)*sin(psi) + sin(phi)*cos(psi)
+        rz = cos(phi)*cos(theta) - self.m*9.81
+
+        A = np.zeros((12,12))
+        A[0,6] = 1
+        A[1,7] = 1
+        A[2,8] = 1
+        A[3,9] = 1
+        A[4,10] = 1
+        A[5,11] = 1
+
+        A[6,3] = F*(-sin(phi)*sin(theta)*cos(psi) + cos(phi)*sin(psi))
+        A[6,4] = F*(cos(phi)*cos(theta)*cos(psi))
+        A[6,5] = F*(cos(phi)*sin(theta)*sin(psi) + sin(phi)*cos(psi))
+
+        A[7,3] = F*(-sin(phi)*sin(theta)*sin(psi) + cos(phi)*cos(psi))
+        A[7,4] = F*(cos(phi)*cos(theta)*sin(psi))
+        A[7,5] = F*(cos(phi)*sin(theta)*cos(psi) - sin(phi)*sin(psi))
+
+        A[8,3] = F*(-sin(phi)*cos(theta))
+        A[8,4] = F*(-cos(phi)*sin(theta))
+
+        B = np.zeros((12,4))
+        B[6,:] = rx/self.m
+        B[7,:] = ry/self.m
+        B[8,:] = rz/self.m
+        B[9,1] = 1/self.I
+        B[9,3] = -1/self.I
+        B[10,0] = -1/self.I
+        B[10,2] = 1/self.I
+        B[11,0] = self.a/self.I
+        B[11,1] = -self.a/self.I
+        B[11,2] = self.a/self.I
+        B[11,3] = -self.a/self.I
+
+        dLdt = np.zeros((12,12))
+        # STUDENT CODE: compute d/dt L(t)
+        dLdt = -0.5 * Q@inv(L).T-A.T@L + 0.5*L@L.T@B@inv(R)@ B.T@L
+
+        return dLdt
+    
+    def dldt_minus(self, t, l):
+        # reshape l to a square matrix
+        L = np.reshape(l, (12, 12))
+
+        # compute Ldot
+        dLdt_minus = -self.Ldot(t, L)
+
+        # reshape back into a vector
+        dldt_minus = np.reshape(dLdt_minus, (144))
+        return dldt_minus
+    
+    def compute_feedback(self, t, x):
+
+        # Retrieve L(t)
+        L = np.reshape(self.l_spline(t), (12, 12))
+        
+        x_e = x - self.x_d(t)
+        x, y, z, phi, theta, psi, x_dot, y_dot, z_dot, phi_dot, theta_dot, psi_dot  = self.x_d(t)
+        rx = cos(phi)*sin(theta)*cos(psi) + sin(phi)*sin(psi)
+        ry = cos(phi)*sin(theta)*sin(psi) + sin(phi)*cos(psi)
+        rz = cos(phi)*cos(theta) - self.m*9.81
+
+        B = np.zeros((12,4))
+        B[6,:] = rx/self.m
+        B[7,:] = ry/self.m
+        B[8,:] = rz/self.m
+        B[9,1] = 1/self.I
+        B[9,3] = -1/self.I
+        B[10,0] = -1/self.I
+        B[10,2] = 1/self.I
+        B[11,0] = self.a/self.I
+        B[11,1] = -self.a/self.I
+        B[11,2] = self.a/self.I
+        B[11,3] = -self.a/self.I
+
+        u_fb = -inv(self.R)@B.T@L@L.T@x_e
+        # STUDENT CODE: Compute optimal feedback inputs u_fb using LQR
+        # Add u_fb to u_d(t), the feedforward term. 
+        # u = u_fb + u_d
+        u = self.u_d(t) + u_fb
+        return u
+    
 #####################################
 
 def main():
@@ -144,16 +300,16 @@ def main():
     #     return np.array([0, z_d, 0, 0, 0, 0])
     
     def xd_func(t):
-        x_d = 0.1 * t
-        y_d = 0.1 * t
-        z_d = 0.5 + 0.1 * t
+        x_d = 0.1
+        y_d = 0.1
+        z_d = 0.5 * t
         return np.array([x_d, y_d, z_d, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     
     # def ud_func(t):
     #     return np.array([m * g / 2, m * g / 2]) # Hover thrust inputs
     
     def ud_func(t):
-        hover_thrust = m * g / 4
+        hover_thrust = m * g / 4 + 0.1
         return np.array([hover_thrust, hover_thrust, hover_thrust, hover_thrust])
 
     
