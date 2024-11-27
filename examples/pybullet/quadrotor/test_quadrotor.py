@@ -213,7 +213,7 @@ class Quadcopter_LQR(object):
 
         A[6,3] = F*(-sin(phi)*sin(theta)*cos(psi) + cos(phi)*sin(psi))
         A[6,4] = F*(cos(phi)*cos(theta)*cos(psi))
-        A[6,5] = F*(cos(phi)*sin(theta)*sin(psi) + sin(phi)*cos(psi))
+        A[6,5] = F*(-cos(phi)*sin(theta)*sin(psi) + sin(phi)*cos(psi))
 
         A[7,3] = F*(-sin(phi)*sin(theta)*sin(psi) + cos(phi)*cos(psi))
         A[7,4] = F*(cos(phi)*cos(theta)*sin(psi))
@@ -226,10 +226,10 @@ class Quadcopter_LQR(object):
         B[6,:] = rx/self.m
         B[7,:] = ry/self.m
         B[8,:] = rz/self.m
-        B[9,1] = 1/self.I
-        B[9,3] = -1/self.I
-        B[10,0] = -1/self.I
-        B[10,2] = 1/self.I
+        B[9,1] = a/self.I
+        B[9,3] = -a/self.I
+        B[10,0] = -a/self.I
+        B[10,2] = a/self.I
         B[11,0] = self.a/self.I
         B[11,1] = -self.a/self.I
         B[11,2] = self.a/self.I
@@ -267,10 +267,10 @@ class Quadcopter_LQR(object):
         B[6,:] = rx/self.m
         B[7,:] = ry/self.m
         B[8,:] = rz/self.m
-        B[9,1] = 1/self.I
-        B[9,3] = -1/self.I
-        B[10,0] = -1/self.I
-        B[10,2] = 1/self.I
+        B[9,1] = self.a/self.I
+        B[9,3] = -self.a/self.I
+        B[10,0] = -self.a/self.I
+        B[10,2] = self.a/self.I
         B[11,0] = self.a/self.I
         B[11,1] = -self.a/self.I
         B[11,2] = self.a/self.I
@@ -304,8 +304,8 @@ def main():
         # y_d = 0.1
         # z_d = 0.5 * t
         # return np.array([x_d, y_d, z_d, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-        x_d = 0.1
-        y_d = 0.1
+        x_d = 0.0
+        y_d = 0.0
         z_d = 0.5 * t
         z_dot = 0.1 * np.sin(2 * np.pi * t)
         return np.array([x_d, y_d, z_d, 0, 0, 0, 0, 0, z_dot, 0, 0, 0])
