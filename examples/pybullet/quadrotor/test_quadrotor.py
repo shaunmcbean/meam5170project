@@ -3,6 +3,7 @@
 from __future__ import print_function
 import pybullet as p
 import time
+from math import *
 import numpy as np
 from examples.pybullet.utils.pybullet_tools.utils import add_data_path, connect, disconnect, wait_for_user, \
     draw_pose, Pose, Point, multiply, interpolate_poses, add_line, point_from_pose, remove_handles, BLUE
@@ -299,17 +300,26 @@ def main():
     #     return np.array([0, z_d, 0, 0, 0, 0])
     
     def xd_func(t):
-        x_d = 0.0
-        y_d = 0.0
-        z_d = 1.0
-        return np.array([x_d, y_d, z_d, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        # x_d = 0.1
+        # y_d = 0.1
+        # z_d = 0.5 * t
+        # return np.array([x_d, y_d, z_d, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        x_d = 0.1
+        y_d = 0.1
+        z_d = 0.5 * t
+        z_dot = 0.1 * np.sin(2 * np.pi * t)
+        return np.array([x_d, y_d, z_d, 0, 0, 0, 0, 0, z_dot, 0, 0, 0])
+
     
     # def ud_func(t):
     #     return np.array([m * g / 2, m * g / 2]) # Hover thrust inputs
     
     def ud_func(t):
+        # hover_thrust = m * g / 4 + 0.1
+        # return np.array([hover_thrust, hover_thrust, hover_thrust, hover_thrust])
         hover_thrust = m * g / 4
-        return np.array([hover_thrust, hover_thrust, hover_thrust, hover_thrust])
+        additional_thrust = 0.1 * np.sin(2 * np.pi * t)  # Oscillating thrust
+        return np.array([hover_thrust + additional_thrust] * 4)
 
     
     # Check the model
@@ -323,7 +333,7 @@ def main():
     print("Testing trajectory...")
     # test_trajectory(quadrotor, start_pose, end_pose)
 
-    simulate_quadrotor(quadrotor, xd_func, ud_func, t_f=3.0, dt=0.01)
+    simulate_quadrotor(quadrotor, xd_func, ud_func, t_f=5.0, dt=0.01)
 
     # Disconnect
     wait_for_user("Press Enter to disconnect...")
