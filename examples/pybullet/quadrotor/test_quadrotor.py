@@ -124,7 +124,6 @@ def simulate_quadrotor(quadrotor, xd_func, ud_func, t_f, dt):
 
         ############################
         # LQR Controller
-        x = xd_func(t)
         u = LQR_controller.compute_feedback(t, x)
         ############################
 
@@ -133,12 +132,12 @@ def simulate_quadrotor(quadrotor, xd_func, ud_func, t_f, dt):
         # step dynamics
         x_dot = quadrotor_dynamics(x, u)
         x += x_dot * dt
-
         # PyBullet simulation update
         # position = [0, x[0], x[1]] # fixed x-axis motion (2D quadrotor)
         # orientation = p.getQuaternionFromEuler([0, 0, x[2]])
         # p.resetBasePositionAndOrientation(quadrotor, position, orientation)
         position = [x[0], x[1], x[2]]
+        print(position)
         orientation = p.getQuaternionFromEuler([x[3], x[4], x[5]])
         p.resetBasePositionAndOrientation(quadrotor, position, orientation)
         p.stepSimulation()
@@ -202,7 +201,7 @@ class Quadcopter_LQR(object):
         F = np.sum(u)/self.m
         rx = cos(phi)*sin(theta)*cos(psi) + sin(phi)*sin(psi)
         ry = cos(phi)*sin(theta)*sin(psi) + sin(phi)*cos(psi)
-        rz = cos(phi)*cos(theta) - self.m*9.81
+        rz = cos(phi)*cos(theta)
 
         A = np.zeros((12,12))
         A[0,6] = 1
@@ -262,7 +261,7 @@ class Quadcopter_LQR(object):
         x, y, z, phi, theta, psi, x_dot, y_dot, z_dot, phi_dot, theta_dot, psi_dot  = self.x_d(t)
         rx = cos(phi)*sin(theta)*cos(psi) + sin(phi)*sin(psi)
         ry = cos(phi)*sin(theta)*sin(psi) + sin(phi)*cos(psi)
-        rz = cos(phi)*cos(theta) - self.m*9.81
+        rz = cos(phi)*cos(theta)
 
         B = np.zeros((12,4))
         B[6,:] = rx/self.m
